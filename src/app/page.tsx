@@ -9,6 +9,8 @@ import type { PhonemeAnnotation, PhonemeStatus } from '@/components/phoneme-anno
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 
 export default function PhonemeAnnotatorPage() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -21,7 +23,9 @@ export default function PhonemeAnnotatorPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (audioFile) {
+    // Client-side only effect to avoid hydration mismatch
+    // This effect is primarily for URL.createObjectURL which is browser-specific
+    if (typeof window !== 'undefined' && audioFile) {
       const url = URL.createObjectURL(audioFile);
       setAudioSrc(url);
       // Cleanup function to revoke the object URL when the component unmounts or the file changes
@@ -40,6 +44,8 @@ export default function PhonemeAnnotatorPage() {
       return;
     }
     setAudioFile(file);
+    setAnnotations([]); // Reset annotations when a new file is uploaded
+    setDataLoaded(false); // Reset data loaded status
     toast({
       title: "Audio File Selected",
       description: `${file.name} is ready.`,
@@ -70,9 +76,10 @@ export default function PhonemeAnnotatorPage() {
       return;
     }
     
+    // crypto.randomUUID is safe here as this function is client-side (triggered by button click)
     setAnnotations(
-      parsedPhonemes.map((p, index) => ({
-        id: crypto.randomUUID(), // Using crypto.randomUUID for unique IDs
+      parsedPhonemes.map((p) => ({
+        id: crypto.randomUUID(), 
         text: p,
         status: 'pending',
       }))
@@ -90,10 +97,45 @@ export default function PhonemeAnnotatorPage() {
           : anno
       )
     );
-    // Optional: Toast for individual annotation update
-    // toast({ title: "Annotation Updated", description: `Phoneme status changed to ${status}.` });
   }, []);
+
+  const handleDownloadAnnotations = useCallback(() => {
+    if (annotations.length === 0) {
+      toast({
+        title: "No Annotations",
+        description: "There are no annotations to download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fileNameBase = audioFile?.name ? audioFile.name.split('.').slice(0, -1).join('.') : "phonemes";
+    const fileName = `${fileNameBase}_annotations.json`;
+    
+    const jsonString = JSON.stringify(annotations, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+
+    toast({
+      title: "Annotations Downloaded",
+      description: `Annotations saved to ${fileName}`,
+    });
+  }, [annotations, audioFile, toast]);
   
+  // Footer year calculation moved to useEffect to avoid hydration mismatch
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
+
   return (
     <>
       <main className="min-h-screen bg-background text-foreground py-8">
@@ -124,13 +166,21 @@ export default function PhonemeAnnotatorPage() {
                 annotations={annotations}
                 onUpdateAnnotation={handleUpdateAnnotation}
               />
+              {annotations.length > 0 && (
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={handleDownloadAnnotations}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Annotations
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </div>
       </main>
       <Toaster />
       <footer className="text-center p-4 text-muted-foreground text-sm border-t mt-auto">
-        © {new Date().getFullYear()} Phoneme Annotator. All rights reserved.
+        {currentYear !== null ? `© ${currentYear} Phoneme Annotator. All rights reserved.` : 'Loading year...'}
       </footer>
     </>
   );
