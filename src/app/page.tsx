@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import type { ChangeEvent } from 'react';
 import { FileUploadSection } from '@/components/phoneme-annotator/FileUploadSection';
 import { AudioPreviewSection } from '@/components/phoneme-annotator/AudioPreviewSection';
 import { AnnotationSection } from '@/components/phoneme-annotator/AnnotationSection';
@@ -23,15 +24,12 @@ export default function PhonemeAnnotatorPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Client-side only effect to avoid hydration mismatch
-    // This effect is primarily for URL.createObjectURL which is browser-specific
     if (typeof window !== 'undefined' && audioFile) {
       const url = URL.createObjectURL(audioFile);
       setAudioSrc(url);
-      // Cleanup function to revoke the object URL when the component unmounts or the file changes
       return () => URL.revokeObjectURL(url);
     }
-    setAudioSrc(null); // Clear audio source if no file
+    setAudioSrc(null); 
   }, [audioFile]);
 
   const handleAudioUpload = useCallback((file: File) => {
@@ -41,11 +39,14 @@ export default function PhonemeAnnotatorPage() {
         description: "Please upload a .wav audio file.",
         variant: "destructive",
       });
+      setAudioFile(null); // Clear potentially invalid file
+      setAudioSrc(null);
       return;
     }
     setAudioFile(file);
-    setAnnotations([]); // Reset annotations when a new file is uploaded
-    setDataLoaded(false); // Reset data loaded status
+    setAnnotations([]); 
+    setDataLoaded(false); 
+    setPhonemesInput(''); // Clear previous phonemes input
     toast({
       title: "Audio File Selected",
       description: `${file.name} is ready.`,
@@ -76,10 +77,9 @@ export default function PhonemeAnnotatorPage() {
       return;
     }
     
-    // crypto.randomUUID is safe here as this function is client-side (triggered by button click)
     setAnnotations(
       parsedPhonemes.map((p) => ({
-        id: crypto.randomUUID(), 
+        id: typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).substring(2), 
         text: p,
         status: 'pending',
       }))
@@ -130,7 +130,6 @@ export default function PhonemeAnnotatorPage() {
     });
   }, [annotations, audioFile, toast]);
   
-  // Footer year calculation moved to useEffect to avoid hydration mismatch
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
@@ -157,11 +156,12 @@ export default function PhonemeAnnotatorPage() {
             phonemesValue={phonemesInput}
             onSubmit={handleSubmitData}
             isProcessing={isProcessing}
+            audioFile={audioFile}
           />
 
-          {dataLoaded && (
+          {dataLoaded && audioFile && (
             <>
-              <AudioPreviewSection audioSrc={audioSrc} />
+              <AudioPreviewSection audioFile={audioFile} audioSrc={audioSrc} />
               <AnnotationSection
                 annotations={annotations}
                 onUpdateAnnotation={handleUpdateAnnotation}

@@ -15,6 +15,7 @@ interface FileUploadSectionProps {
   phonemesValue: string;
   onSubmit: () => void;
   isProcessing: boolean;
+  audioFile: File | null; // Added to control button state
 }
 
 export function FileUploadSection({
@@ -23,10 +24,15 @@ export function FileUploadSection({
   phonemesValue,
   onSubmit,
   isProcessing,
+  audioFile,
 }: FileUploadSectionProps) {
   const handleAudioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       onAudioUpload(event.target.files[0]);
+    } else {
+      // Handle case where file selection is cancelled
+      // Depending on desired behavior, you might pass null or an empty File object
+      // For now, this assumes onAudioUpload can handle or ignore non-file inputs if needed
     }
   };
 
@@ -75,7 +81,11 @@ export function FileUploadSection({
             />
           </div>
         </div>
-        <Button onClick={onSubmit} disabled={isProcessing || !phonemesValue} className="w-full md:w-auto">
+        <Button 
+          onClick={onSubmit} 
+          disabled={isProcessing || !phonemesValue.trim() || !audioFile} 
+          className="w-full md:w-auto"
+        >
           {isProcessing ? 'Processing...' : 'Load Data for Annotation'}
         </Button>
       </CardContent>
