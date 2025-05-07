@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PhonemeAnnotation, PhonemeStatus } from "./types";
+import { arpabetPhonemes } from "./arpabet";
 import { CheckCircle2, XCircle, Edit3, Save, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,18 +29,18 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
   }, [annotation]);
 
   const handleSave = () => {
-    onUpdateAnnotation(annotation.id, currentStatus, substitution);
+    onUpdateAnnotation(annotation.id, currentStatus, currentStatus === 'substituted' ? substitution : undefined);
     setPopoverOpen(false);
   };
 
   const getStatusColor = () => {
     switch (annotation.status) {
       case 'correct':
-        return 'bg-green-500 hover:bg-green-600 text-white'; // Using a specific green for clarity
+        return 'bg-green-500 hover:bg-green-600 text-white'; 
       case 'deleted':
-        return 'bg-red-500 hover:bg-red-600 text-white line-through'; // Specific red
+        return 'bg-red-500 hover:bg-red-600 text-white line-through'; 
       case 'substituted':
-        return 'bg-yellow-500 hover:bg-yellow-600 text-black'; // Specific yellow
+        return 'bg-yellow-500 hover:bg-yellow-600 text-black'; 
       case 'pending':
       default:
         return 'bg-secondary hover:bg-secondary/80 text-secondary-foreground';
@@ -53,7 +54,7 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
       case 'deleted':
         return <XCircle className="mr-1 h-4 w-4" />;
       case 'substituted':
-        return <AlertTriangle className="mr-1 h-4 w-4" />; // Changed to AlertTriangle
+        return <AlertTriangle className="mr-1 h-4 w-4" />; 
       case 'pending':
       default:
         return <Edit3 className="mr-1 h-4 w-4" />;
@@ -85,7 +86,13 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
           <h4 className="font-medium leading-none">Annotate: <span className="font-bold font-mono">{annotation.text}</span></h4>
           <RadioGroup
             value={currentStatus}
-            onValueChange={(value) => setCurrentStatus(value as PhonemeStatus)}
+            onValueChange={(value) => {
+              setCurrentStatus(value as PhonemeStatus);
+              // If not 'substituted', clear substitution
+              if (value !== 'substituted') {
+                setSubstitution('');
+              }
+            }}
             className="space-y-1"
           >
             <div className="flex items-center space-x-2">
@@ -105,17 +112,33 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
         
         {currentStatus === 'substituted' && (
           <div className="space-y-1">
-            <Label htmlFor={`sub-${annotation.id}`}>Pronounced Phoneme</Label>
-            <Input
-              id={`sub-${annotation.id}`}
+            <Label htmlFor={`sub-select-${annotation.id}`}>Pronounced Phoneme (ARPAbet)</Label>
+            <Select
               value={substitution}
-              onChange={(e) => setSubstitution(e.target.value)}
-              placeholder="Enter phoneme"
-              className="h-8"
-            />
+              onValueChange={setSubstitution}
+            >
+              <SelectTrigger id={`sub-select-${annotation.id}`} className="h-8">
+                <SelectValue placeholder="Select phoneme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>ARPAbet Symbols</SelectLabel>
+                  {arpabetPhonemes.map((phoneme) => (
+                    <SelectItem key={phoneme} value={phoneme}>
+                      {phoneme}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         )}
-        <Button onClick={handleSave} className="w-full" size="sm">
+        <Button 
+          onClick={handleSave} 
+          className="w-full" 
+          size="sm"
+          disabled={currentStatus === 'substituted' && !substitution}
+        >
           <Save className="mr-2 h-4 w-4" />
           Apply Annotation
         </Button>
@@ -123,3 +146,4 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
     </Popover>
   );
 }
+
