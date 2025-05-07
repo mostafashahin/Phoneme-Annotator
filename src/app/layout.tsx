@@ -26,7 +26,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning={true}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
+      <body 
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`} 
+        suppressHydrationWarning={true}
+      >
         <div className="flex-grow">
           {children}
         </div>
