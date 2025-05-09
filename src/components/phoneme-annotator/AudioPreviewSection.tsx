@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +14,6 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
   const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    // Initialize AudioContext on mount
     if (typeof window !== 'undefined' && !audioContextRef.current) {
       try {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -23,8 +21,6 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
         console.error("Error creating AudioContext:", e);
       }
     }
-    // No cleanup needed for audioContextRef here if it's managed per component instance lifetime.
-    // If it were global or longer-lived, cleanup would be in a separate mount/unmount effect.
   }, []);
 
   useEffect(() => {
@@ -54,22 +50,16 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
     }
     
     if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
-        // Defer drawing if canvas isn't sized by layout yet
-        // This can happen if the component or its parent is display: none initially
         const observer = new ResizeObserver(entries => {
             if (entries[0].contentRect.width > 0 && entries[0].contentRect.height > 0) {
                 observer.disconnect();
-                // Trigger re-run of effect by changing a dummy state or re-calling draw logic
-                // For simplicity, we'll just assume it gets dimensions eventually.
-                // A more robust solution would involve a state update to re-trigger.
-                // For now, if it's 0, it might mean it's hidden, so don't draw.
+                // Re-trigger drawing if necessary, though useEffect on audioFile should handle it
             }
         });
         observer.observe(canvas);
-        // If still 0,0 after a short delay, draw placeholder
         const fallbackTimeout = setTimeout(() => {
              if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
-                drawPlaceholderText('Canvas not ready for spectrogram');
+                drawPlaceholderText('Canvas not ready for waveform');
              }
         }, 100);
         return () => {
@@ -77,7 +67,6 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
             clearTimeout(fallbackTimeout);
         }
     }
-
 
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
@@ -90,7 +79,6 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
     ctx.font = '14px sans-serif';
     ctx.fillText('Processing audio...', canvas.width / 2, canvas.height / 2);
 
-
     const reader = new FileReader();
     reader.onload = async (e) => {
       if (!e.target?.result || typeof e.target.result === 'string' || !audioCtx || audioCtx.state === 'closed') {
@@ -100,44 +88,51 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
       
       try {
         const audioBuffer = await audioCtx.decodeAudioData(e.target.result as ArrayBuffer);
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear "Processing..."
-
-        const channelData = audioBuffer.getChannelData(0); 
-        const numTimeSegments = canvas.width; 
-        const samplesPerTimeSegment = Math.floor(channelData.length / numTimeSegments);
         
-        const numFrequencyBands = Math.max(8, Math.floor(canvas.height / 4)); // Dynamic bands based on height, min 8 bands, each 4px
-        const bandHeight = canvas.height / numFrequencyBands;
+        const channelData = audioBuffer.getChannelData(0); 
+        const numSamples = channelData.length;
+        const middleY = canvas.height / 2;
 
-        for (let i = 0; i < numTimeSegments; i++) {
-          const timeSegmentStart = i * samplesPerTimeSegment;
-          const timeSegmentEnd = timeSegmentStart + samplesPerTimeSegment;
-          const timeSegmentData = channelData.slice(timeSegmentStart, timeSegmentEnd);
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear "Processing..." text
 
-          if (timeSegmentData.length === 0) continue;
-
-          const samplesPerFreqBand = Math.max(1, Math.floor(timeSegmentData.length / numFrequencyBands));
-
-          for (let j = 0; j < numFrequencyBands; j++) {
-            const freqBandStart = j * samplesPerFreqBand;
-            const freqBandEnd = freqBandStart + samplesPerFreqBand;
-            const freqBandData = timeSegmentData.slice(freqBandStart, freqBandEnd);
-
-            if (freqBandData.length === 0) continue;
-
-            let sumOfSquares = 0;
-            for (let k = 0; k < freqBandData.length; k++) {
-              sumOfSquares += freqBandData[k] * freqBandData[k];
-            }
-            const rms = Math.sqrt(sumOfSquares / freqBandData.length);
-            const intensity = Math.min(1, rms * 3.5); // Adjusted multiplier
-
-            const grayValue = Math.floor(intensity * 200) + 55; // Brighter, less black
-            ctx.fillStyle = `rgb(${grayValue}, ${grayValue}, ${grayValue})`;
-            
-            ctx.fillRect(i, canvas.height - (j + 1) * bandHeight, 1, Math.ceil(bandHeight)); // Use Math.ceil for bandHeight to avoid gaps
-          }
+        if (numSamples === 0) {
+          drawPlaceholderText('No audio data for waveform');
+          return;
         }
+
+        ctx.strokeStyle = 'hsl(var(--primary))'; // Use primary color from theme
+        ctx.lineWidth = 1; // Line width for the waveform
+
+        for (let x = 0; x < canvas.width; x++) {
+          const startIndex = Math.floor(x * numSamples / canvas.width);
+          const endIndex = Math.floor((x + 1) * numSamples / canvas.width);
+          
+          let minAmp = 0;
+          let maxAmp = 0;
+
+          if (startIndex < endIndex && startIndex < numSamples) { // Samples exist for this pixel
+            minAmp = channelData[startIndex];
+            maxAmp = channelData[startIndex];
+            for (let i = startIndex + 1; i < endIndex && i < numSamples; i++) {
+              if (channelData[i] < minAmp) minAmp = channelData[i];
+              if (channelData[i] > maxAmp) maxAmp = channelData[i];
+            }
+          } else if (startIndex < numSamples) { // Single sample maps to this pixel column or exactly at the end
+            minAmp = channelData[startIndex];
+            maxAmp = channelData[startIndex];
+          }
+          // If startIndex >= numSamples, minAmp and maxAmp remain 0, drawing a line at middleY
+
+          const yMax = middleY - maxAmp * middleY; 
+          const yMin = middleY - minAmp * middleY;
+
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, yMin); // x + 0.5 for sharper lines
+          // Ensure a line is drawn even if yMin and yMax are the same (e.g., silence or DC offset)
+          ctx.lineTo(x + 0.5, yMax === yMin ? yMax + 0.5 : yMax);
+          ctx.stroke();
+        }
+
       } catch (decodeError) {
         console.error("Error decoding audio data:", decodeError);
         drawPlaceholderText('Error processing audio');
@@ -151,10 +146,9 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
     
     reader.readAsArrayBuffer(audioFile);
 
-  }, [audioFile]);
+  }, [audioFile]); // Re-run when audioFile changes
 
-
-  if (!audioSrc && !audioFile) return null; // Don't render section if no audio source or file for processing
+  if (!audioSrc && !audioFile) return null;
 
   return (
     <Card className="shadow-lg">
@@ -170,12 +164,12 @@ export function AudioPreviewSection({ audioFile, audioSrc }: AudioPreviewSection
             Your browser does not support the audio element.
           </audio>
         )}
-        <div className="bg-muted rounded-md border border-dashed" data-ai-hint="spectrogram audio">
+        <div className="bg-muted rounded-md border border-dashed" data-ai-hint="waveform audio">
           <canvas 
             ref={canvasRef} 
             className="w-full block rounded-md" 
-            style={{ height: '120px' }} // Fixed height for consistent aspect ratio
-            aria-label="Audio spectrogram"
+            style={{ height: '120px' }} 
+            aria-label="Audio waveform"
           ></canvas>
         </div>
       </CardContent>

@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PhonemeAnnotation, PhonemeStatus } from "./types";
-import { arpabetPhonemes } from "./arpabet";
+import { ipaPhonemes } from "./arpabet";
 import { CheckCircle2, XCircle, Edit3, Save, AlertTriangle } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PhonemeChipProps {
@@ -54,6 +55,8 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
       case 'deleted':
         return <XCircle className="mr-1 h-4 w-4" />;
       case 'substituted':
+        return <AlertTriangle className="mr-1 h-4 w-4" />;
+ case 'inserted':
         return <AlertTriangle className="mr-1 h-4 w-4" />; 
       case 'pending':
       default:
@@ -107,6 +110,11 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
               <RadioGroupItem value="substituted" id={`substituted-${annotation.id}`} />
               <Label htmlFor={`substituted-${annotation.id}`} className="cursor-pointer">Substituted</Label>
             </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="inserted" id={`inserted-${annotation.id}`} />
+              <Label htmlFor={`inserted-${annotation.id}`} className="cursor-pointer">Inserted</Label>
+            </div>
+ 
           </RadioGroup>
         </div>
         
@@ -123,7 +131,7 @@ export function PhonemeChip({ annotation, onUpdateAnnotation }: PhonemeChipProps
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>ARPAbet Symbols</SelectLabel>
-                  {arpabetPhonemes.map((phoneme) => (
+                  {ipaPhonemes.map((phoneme) => (
                     <SelectItem key={phoneme} value={phoneme}>
                       {phoneme}
                     </SelectItem>

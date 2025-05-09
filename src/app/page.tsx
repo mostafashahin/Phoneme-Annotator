@@ -89,6 +89,17 @@ export default function PhonemeAnnotatorPage() {
     setIsProcessing(false);
   }, [audioFile, phonemesInput, toast]);
 
+  const handleRemovePhoneme = useCallback((indexToRemove: number) => {
+    setAnnotations(prevAnnotations => {
+      const newAnnotations = prevAnnotations.filter((_, index) => index !== indexToRemove);
+      return newAnnotations;
+    });
+    toast({
+      title: "Phoneme Removed",
+      description: `Phoneme at index ${indexToRemove + 1} removed.`,
+    });
+  }, [toast]);
+
   const handleUpdateAnnotation = useCallback((id: string, status: PhonemeStatus, substitutionText?: string) => {
     setAnnotations(prevAnnotations =>
       prevAnnotations.map(anno =>
@@ -98,6 +109,23 @@ export default function PhonemeAnnotatorPage() {
       )
     );
   }, []);
+
+  const handleInsertPhoneme = useCallback((phonemeText: string, index: number) => {
+    const newAnnotation: PhonemeAnnotation = {
+      id: typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
+      text: phonemeText,
+      status: 'pending',
+    };
+    setAnnotations(prevAnnotations => [
+      ...prevAnnotations.slice(0, index),
+      newAnnotation,
+      ...prevAnnotations.slice(index),
+    ]);
+    toast({
+      title: "Phoneme Inserted",
+      description: `Phoneme "${phonemeText}" inserted.`,
+    });
+  }, [toast]);
 
   const handleDownloadAnnotations = useCallback(() => {
     if (annotations.length === 0) {
@@ -164,7 +192,10 @@ export default function PhonemeAnnotatorPage() {
               <AudioPreviewSection audioFile={audioFile} audioSrc={audioSrc} />
               <AnnotationSection
                 annotations={annotations}
-                onUpdateAnnotation={handleUpdateAnnotation}
+                onUpdatePhonemeAnnotation={handleUpdateAnnotation} // Corrected prop name here
+                onInsertPhoneme={handleInsertPhoneme}
+                originalText={phonemesInput}
+                onRemovePhoneme={handleRemovePhoneme}
               />
               {annotations.length > 0 && (
                 <div className="mt-6 flex justify-end">
